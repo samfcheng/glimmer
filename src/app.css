@@ -1,0 +1,182 @@
+:root {
+	--color-bg: #222222;
+	--color-panel: #2A2A2A;
+	--color-panel-border: #373737;
+	--color-text: #e4e4e7;
+	--color-text-muted: #8b8b92;
+	--color-accent: #3b9eff;
+	--color-accent-text: #ffffff;
+	--color-selected: #3b9eff;
+	--color-handle: #ffffff;
+	--color-handle-stroke: #000000;
+	--color-segment-line: #ffffff;
+	--color-label-bg: #ffffff;
+	--color-label-text: #111111;
+	--color-danger: #ff5c5c;
+	--color-input-bg: #373737;
+	--color-track: rgba(255, 255, 255, 0.1);
+	--color-track-fill: rgba(255, 255, 255, 0.25);
+	--color-thumb: #f9f9f9;
+	--color-thumb-shadow: transparent;
+	--color-toggle-group-bg: rgba(255, 255, 255, 0.05);
+	--color-toggle-active-bg: rgba(255, 255, 255, 0.08);
+	--color-text-dim: rgba(255, 255, 255, 0.57);
+	--color-heading: rgba(255, 255, 255, 0.9);
+	--color-hover: rgba(255, 255, 255, 0.1);
+	--radius-sm: 6px;
+	--radius-md: 10px;
+	--radius-lg: 14px;
+	--space-xs: 4px;
+	--space-sm: 8px;
+	--space-md: 12px;
+	--space-lg: 20px;
+	--font-sans:
+		-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Light theme — only recolors the app chrome (panels, text, controls). The
+   on-canvas overlay colors (handles, segment lines, labels) stay the same in
+   both themes since they sit on the user's image, not on themed UI. */
+:root[data-theme='light'] {
+	--color-bg: #ececee;
+	--color-panel: #f7f7f8;
+	--color-panel-border: #e0e0e3;
+	--color-text: #27272b;
+	--color-text-muted: #77777f;
+	--color-danger: #e5484d;
+	--color-input-bg: #e6e6ea;
+	--color-track: rgba(0, 0, 0, 0.08);
+	--color-track-fill: rgba(0, 0, 0, 0.24);
+	--color-thumb: #ffffff;
+	--color-thumb-shadow: rgba(0, 0, 0, 0.35);
+	--color-toggle-group-bg: rgba(0, 0, 0, 0.05);
+	--color-toggle-active-bg: #ffffff;
+	--color-text-dim: rgba(0, 0, 0, 0.55);
+	--color-heading: rgba(0, 0, 0, 0.88);
+	--color-hover: rgba(0, 0, 0, 0.06);
+}
+
+* {
+	box-sizing: border-box;
+	interpolate-size: allow-keywords;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: var(--font-sans);
+	font-size: 13px;
+}
+
+button {
+	font-family: inherit;
+}
+
+/* ── Utilities ─────────────────────────────────────────────────────────────
+   Shared UI primitives, declared once here instead of being re-invented in
+   each sidebar section. Adding a new section should mean reaching for these
+   classes rather than writing another near-identical block of scoped CSS.
+   Hover is a uniform opacity fade: a background swap read inconsistently
+   across the differently-tinted surfaces these controls sit on. */
+
+.button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+	height: 24px;
+	padding: 0 8px;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: var(--color-toggle-group-bg);
+	color: var(--color-text);
+	font-family: inherit;
+	font-size: 12px;
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: opacity 0.12s ease;
+}
+
+.button:hover:not(:disabled),
+.button.is-active {
+	opacity: 0.9;
+}
+
+.button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Buttons sitting side by side, splitting the width evenly. */
+.button-row {
+	display: flex;
+	align-items: stretch;
+	gap: 6px;
+}
+
+.button-row > .button {
+	flex: 1;
+	min-width: 0;
+}
+
+/* Matches the label a Slider/SegmentedToggle renders above itself, so a bare
+   control group lines up with the built-in ones. */
+.control-label {
+	display: block;
+	margin: 6px 0 2px;
+	color: var(--color-text);
+	font-size: 12px;
+}
+
+.select {
+	flex-shrink: 0;
+	height: 24px;
+	padding: 0 4px;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: var(--color-toggle-group-bg);
+	color: var(--color-text);
+	font-family: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	transition: opacity 0.12s ease;
+}
+
+.select:hover {
+	opacity: 0.8;
+}
+
+/* Floating panel anchored beside the sidebar (particle selector, image
+   library, start/end behavior). Positioning is set inline by each caller. */
+.popup {
+	position: fixed;
+	z-index: 100;
+	background: var(--color-panel);
+	border: 1px solid var(--color-panel-border);
+	border-radius: 8px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	overflow: hidden;
+}
+
+.popup-header {
+	padding: 8px 12px 9px;
+	border-bottom: 1px solid var(--color-panel-border);
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--color-text);
+}
+
+.popup-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 12px 12px;
+}
