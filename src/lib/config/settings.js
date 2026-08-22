@@ -46,6 +46,14 @@ export const settings = {
 	// --- Appearance ---
 	// Cross-fade between a region's dark and lit state, in milliseconds.
 	fade: { min: 0, max: 1000, step: 10 },
+	// How far each region grows outwards in the mask, in screen px. A hair of
+	// it is needed even on a gapless SVG: two paths sharing an edge each cover
+	// about half of the boundary pixel, and half over half composites to 75%
+	// rather than 100%, leaving a seam of unlit base image along every shared
+	// edge. Growing both sides past the seam fills it. Screen px (not viewBox
+	// units) so the fix stays the same size as the artefact it covers at any
+	// zoom, on an SVG of any scale.
+	regionPadding: { min: 0, max: 6, step: 0.25 },
 
 	// --- Debug ---
 	// Screen width of the region outlines, in px (they never scale with zoom).
@@ -78,7 +86,8 @@ export const defaults = {
 	showCircle: false,
 	showPaths: false,
 	pathWidth: 1,
-	fadeMs: 120
+	fadeMs: 120,
+	regionPaddingPx: 1
 };
 
 /**

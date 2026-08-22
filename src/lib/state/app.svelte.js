@@ -61,6 +61,7 @@ export class AppState {
 	showPaths = $state(defaults.showPaths);
 	pathWidth = $state(defaults.pathWidth);
 	fadeMs = $state(defaults.fadeMs);
+	regionPaddingPx = $state(defaults.regionPaddingPx);
 
 	/** Seed behind the current random-mode rolls; bumping it is a scramble. */
 	seed = $state(Math.floor(Math.random() * 0xffffffff));

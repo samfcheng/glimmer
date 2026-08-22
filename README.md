@@ -17,6 +17,10 @@ Two modes:
   image. Speed, Wavelength (gap between crests), Band (how much of each wave is
   lit), and Softness are in the sidebar.
 
+The Regions section carries a **Padding** slider: it grows every region
+outwards in the mask by a few screen pixels, closing both the hairline seam
+where two regions share an edge and any real gaps between them.
+
 Debug overlays (region outlines — red when dark, blue when lit, at an
 adjustable width — and the interactive circle) live in the sidebar's Debug
 section.

@@ -20,11 +20,20 @@
 			<!--
 				The lit layer is one image composited through one mask, rather than
 				a path per region each filled with a copy of the image: the cost
-				stays flat as the region count climbs, while per-region
-				`fill-opacity` still gives every window its own state (and its own
-				fade). Pure white is deliberate — mask luminance then depends only
-				on the alpha `fill-opacity` sets, dodging the colour-space question
-				a tinted fill would raise.
+				stays flat as the region count climbs, while per-region `opacity`
+				still gives every window its own state (and its own fade). Pure
+				white is deliberate — mask luminance then depends only on the alpha
+				the opacity sets, dodging the colour-space question a tinted fill
+				would raise.
+			-->
+			<!--
+				Each region is grown by a white stroke (`stroke-width` is doubled
+				because only its outer half lands outside the path) to close the
+				anti-aliasing seam where two regions share an edge — see
+				`settings.regionPadding`. `opacity` rather than `fill-opacity`
+				carries the level: it composites fill and stroke as one group, so a
+				half-lit region doesn't show a brighter rim where the stroke's
+				inner half doubles up on the fill.
 			-->
 			<!--
 				Both the mask region and its content are declared in the SVG's own
@@ -43,7 +52,11 @@
 							d={region.d}
 							transform={region.transform}
 							fill="#fff"
-							fill-opacity={app.levels[i] ?? 0}
+							stroke={app.regionPaddingPx > 0 ? '#fff' : 'none'}
+							stroke-width={app.regionPaddingPx * 2}
+							stroke-linejoin="round"
+							vector-effect="non-scaling-stroke"
+							opacity={app.levels[i] ?? 0}
 						/>
 					{/each}
 				</g>
@@ -117,7 +130,7 @@
 	/* Fading the mask paths is what turns a window "on" gradually. `--fade` is
 	   set on their group so one declaration covers every region. */
 	.region {
-		transition: fill-opacity var(--fade) linear;
+		transition: opacity var(--fade) linear;
 	}
 
 	.outline {

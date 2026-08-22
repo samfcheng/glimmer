@@ -1,7 +1,9 @@
 <script>
 	import { getAppState } from '$lib/state/app.svelte.js';
+	import { settings } from '$lib/config/settings.js';
 	import Section from '../ui/Section.svelte';
 	import IconButton from '../ui/IconButton.svelte';
+	import Slider from '../ui/Slider.svelte';
 	import { IconClipboardText, IconMinus, IconUpload, IconVectorTriangle } from '@tabler/icons-svelte-runes';
 
 	const app = getAppState();
@@ -53,6 +55,19 @@
 		{#each app.svg.warnings as warning (warning)}
 			<p class="note">{warning}</p>
 		{/each}
+		<!--
+			Grows every region outwards in the mask. A little is on by default,
+			since even a gapless SVG seams along shared edges; more of it closes
+			real gutters between regions too.
+		-->
+		<Slider
+			label="Padding"
+			bind:value={app.regionPaddingPx}
+			min={settings.regionPadding.min}
+			max={settings.regionPadding.max}
+			step={settings.regionPadding.step}
+			formatValue={(v) => `${v}px`}
+		/>
 	{/if}
 
 	<div class="button-row">

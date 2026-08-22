@@ -77,8 +77,8 @@ Two decisions worth not undoing:
 
 - **One image through one mask**, rather than a path per region each filled with
   its own copy of the image: cost stays flat as the region count climbs, while
-  per-region `fill-opacity` still gives each window its own state and its own
-  CSS fade.
+  per-region `opacity` still gives each window its own state and its own CSS
+  fade.
 - **The view transform is applied *inside* the mask and inside the masked
   group — never on the element carrying `mask=`.** Whether an element's own
   transform also transforms its mask is a detail browsers have disagreed on;
@@ -86,7 +86,19 @@ Two decisions worth not undoing:
   pan and zoom can't slide the lights off their windows.
 
 Mask paths are filled pure white, so mask luminance depends only on the alpha
-`fill-opacity` sets — no colour-space question.
+the opacity sets — no colour-space question.
+
+**Region padding** (`app.regionPaddingPx`) grows each mask path by a white
+`vector-effect="non-scaling-stroke"` stroke of twice that width, so only its
+outer half lands outside the path. Some of it is on by default because two
+regions sharing an edge each cover roughly half of the boundary pixel, and half
+composited over half is 75%, not 100% — an unlit seam of base image along every
+shared edge. Growing both sides past the seam fills it, and *screen* px keeps
+the fix the same size as the artefact at any zoom and on an SVG of any scale.
+Turned up, it also closes real gutters between regions. The level rides on
+`opacity` rather than `fill-opacity` precisely because of this stroke: element
+opacity composites fill and stroke as one group, so a half-lit region has no
+brighter rim where the stroke's inner half doubles up on the fill.
 
 `Scene` renders nothing until all three pieces are in (`AppState.hasScene`) —
 a base image with no regions over it just looks broken, so the stage shows the
