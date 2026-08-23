@@ -1,35 +1,28 @@
 <script>
 	import { getAppState } from '$lib/state/app.svelte.js';
-	import { settings } from '$lib/config/settings.js';
+	import { MODES, settings } from '$lib/config/settings.js';
 	import { formatPercent, parsePercent } from '$lib/utils/percent.js';
 	import Section from '../ui/Section.svelte';
 	import Slider from '../ui/Slider.svelte';
-	import SegmentedToggle from '../ui/SegmentedToggle.svelte';
+	import Select from '../ui/Select.svelte';
 	import Toggle from '../ui/Toggle.svelte';
 	import { IconDice5 } from '@tabler/icons-svelte-runes';
 
 	const app = getAppState();
 </script>
 
+<!--
+	A dropdown rather than the segmented toggle the other three modes shipped
+	with: four segments already crowd a 280px panel, and the list is the sort of
+	thing that grows.
+-->
 <Section title="Mode">
-	<SegmentedToggle
-		label="Lighting"
-		bind:value={app.mode}
-		options={[
-			{ value: 'random', label: 'Random' },
-			{ value: 'interactive', label: 'Interactive' },
-			{ value: 'waves', label: 'Waves' }
-		]}
-	/>
+	<Select label="Lighting" bind:value={app.mode} options={MODES} />
 
 	{#if app.mode === 'random'}
-		<!--
-			Lit Chance slides a cut-off through rolls that stay fixed until the
-			next scramble, so raising it lights more windows instead of
-			reshuffling which ones are on.
-		-->
 		<Slider
 			label="Lit Chance"
+			info="Slides a cut-off through rolls that stay fixed until the next scramble, so raising it lights more windows rather than reshuffling which ones are on."
 			bind:value={app.litChance}
 			min={settings.litChance.min}
 			max={settings.litChance.max}
@@ -41,9 +34,11 @@
 			<IconDice5 size={12} />
 			Scramble
 		</button>
-		<p class="hint">Clicking the image scrambles too — dragging pans instead.</p>
-
-		<Toggle label="Animate" bind:checked={app.autoScramble} />
+		<Toggle
+			label="Animate"
+			info="Re-scrambles on a beat. Clicking the image scrambles too — dragging pans instead."
+			bind:checked={app.autoScramble}
+		/>
 		{#if app.autoScramble}
 			<Slider
 				label="Delay"
@@ -56,12 +51,3 @@
 		{/if}
 	{/if}
 </Section>
-
-<style>
-	.hint {
-		margin: 8px 0 0;
-		color: var(--color-text-dim);
-		font-size: 11px;
-		line-height: 1.4;
-	}
-</style>

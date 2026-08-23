@@ -4,6 +4,7 @@
 	import { computeFitTransform, screenToFrame } from '$lib/geometry/transform.js';
 	import { easeToward, interactiveLevels, levelsMatch } from '$lib/light/interactive.js';
 	import { waveCoordinates, waveLevels } from '$lib/light/waves.js';
+	import { sequenceLevels } from '$lib/light/animation.js';
 	import { frameDelta } from '$lib/light/clock.js';
 	import Scene from './Scene.svelte';
 	import CursorCircle from './CursorCircle.svelte';
@@ -147,6 +148,53 @@
 		return () => cancelAnimationFrame(frameId);
 	});
 
+	// Animation mode: the same shape again, but the loop only advances a clock
+	// — every frame is `sequenceLevels(timeMs)`, a pure lookup. Nothing
+	// accumulates, which is what lets the scrubber, a loop restart and the
+	// offscreen video export all land on the same picture for the same
+	// millisecond.
+	$effect(() => {
+		if (app.mode !== 'animation') return;
+
+		let frameId = 0;
+		let lastTime = 0;
+
+		const tick = (time) => {
+			frameId = requestAnimationFrame(tick);
+			const dt = frameDelta(lastTime, time);
+			lastTime = time;
+
+			if (app.animationPlaying) {
+				const advanced = app.animationTimeMs + dt * 1000;
+				// A sequence that isn't looping stops on its last frame rather
+				// than running the clock on past the end for ever.
+				if (!app.animationLoop && advanced >= app.animationDuration) {
+					app.animationTimeMs = app.animationDuration;
+					app.animationPlaying = false;
+				} else {
+					// Wrapped rather than left to grow: the scrubber writes an
+					// absolute time into the same field, so keeping it inside one
+					// pass is what stops the two disagreeing about "now" after the
+					// sequence has looped for a while.
+					app.animationTimeMs =
+						app.animationLoop && app.animationDuration > 0
+							? advanced % app.animationDuration
+							: advanced;
+				}
+			}
+
+			const next = sequenceLevels(app.animationSteps, app.animationLayout, app.animationTimeMs, {
+				loop: app.animationLoop,
+				starts: app.animationStarts,
+				arrivals: app.animationArrivals
+			});
+			if (!levelsMatch(next, app.levels)) app.levels = next;
+		};
+
+		frameId = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(frameId);
+	});
+
 	// --- Pointer: pan on drag, scramble on click ------------------------
 	// A press starts a *candidate* pan; it only becomes one past a few pixels
 	// of movement. Anything shorter is a click, which is the scramble gesture
@@ -246,9 +294,16 @@
 
 	function handleKeydown(event) {
 		if (isTypingTarget(document.activeElement)) return;
-		if (event.code === 'Space' && !spaceHeld) {
+		if (event.code === 'Space') {
 			event.preventDefault();
-			spaceHeld = true;
+			// In animation mode Space is the transport, the way it is in every
+			// video player. Nothing is given up for it: space-pan only ever set
+			// the grab cursor — a drag pans in every mode with or without it.
+			if (app.mode === 'animation') {
+				if (!event.repeat) app.animationPlaying = !app.animationPlaying;
+			} else if (!spaceHeld) {
+				spaceHeld = true;
+			}
 			return;
 		}
 		if ((event.metaKey || event.ctrlKey) && event.key === '\\') {

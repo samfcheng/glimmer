@@ -44,11 +44,9 @@
 			formatValue={(v) => (v === 0 ? 'frozen' : `${v.toFixed(2)}/s`)}
 			parseValue={(text) => parseFloat(text)}
 		/>
-		<!-- Wavelength is the gap between crests; Band is how much of each
-		     wave is lit. Together they set how many waves are on screen and
-		     how wide each lit stripe is. -->
 		<Slider
 			label="Wavelength"
+			info="The gap between crests, as a share of the travel axis: 100% puts one wave across the whole image, 25% puts four."
 			bind:value={app.waveLength}
 			min={settings.waveLength.min}
 			max={settings.waveLength.max}
@@ -58,6 +56,7 @@
 		/>
 		<Slider
 			label="Band"
+			info="How much of each wave is lit."
 			bind:value={app.waveBand}
 			min={settings.waveBand.min}
 			max={settings.waveBand.max}
@@ -74,18 +73,10 @@
 			formatValue={formatPercent}
 			parseValue={parsePercent}
 		/>
-		<Toggle label="Twinkle" bind:checked={app.twinkle} />
-		<p class="hint">
-			Wavelength sets how far apart the crests are; Band is the lit share of each one.
-		</p>
+		<Toggle
+			label="Twinkle"
+			info="Rerolls the wavefront's soft edge every frame — a shimmer instead of an edge that travels with the wave."
+			bind:checked={app.twinkle}
+		/>
 	</Section>
 {/if}
-
-<style>
-	.hint {
-		margin: 8px 0 0;
-		color: var(--color-text-dim);
-		font-size: 11px;
-		line-height: 1.4;
-	}
-</style>

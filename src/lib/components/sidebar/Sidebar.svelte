@@ -6,6 +6,8 @@
 	import ModeSection from './ModeSection.svelte';
 	import InteractiveSection from './InteractiveSection.svelte';
 	import WavesSection from './WavesSection.svelte';
+	import AnimationSection from './AnimationSection.svelte';
+	import ExportSection from './ExportSection.svelte';
 	import AppearanceSection from './AppearanceSection.svelte';
 	import DebugSection from './DebugSection.svelte';
 
@@ -28,6 +30,8 @@
 		<ModeSection />
 		<InteractiveSection />
 		<WavesSection />
+		<AnimationSection />
+		<ExportSection />
 	{/if}
 	<AppearanceSection />
 	{#if app.hasImage}

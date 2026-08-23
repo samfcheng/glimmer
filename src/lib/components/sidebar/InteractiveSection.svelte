@@ -32,13 +32,9 @@
 			formatValue={(v) => (v === 0 ? 'instant' : `${Math.round(v * 1000)}ms`)}
 			parseValue={(text) => parseFloat(text) / 1000}
 		/>
-		<!--
-			Smoothing is how far in from the rim regions stop being lit
-			outright and start being lit only if they clear their own
-			threshold — a scattered edge rather than a clean arc.
-		-->
 		<Slider
 			label="Smoothing"
+			info="How far in from the rim windows stop being lit outright and start being lit only if they clear their own threshold — a scattered edge rather than a clean arc."
 			bind:value={app.smoothing}
 			min={settings.smoothing.min}
 			max={settings.smoothing.max}
@@ -46,18 +42,10 @@
 			formatValue={formatPercent}
 			parseValue={parsePercent}
 		/>
-		<Toggle label="Twinkle" bind:checked={app.twinkle} />
-		<p class="hint">
-			Twinkle rerolls the soft edge every frame — a shimmer instead of a settled scatter.
-		</p>
+		<Toggle
+			label="Twinkle"
+			info="Rerolls the soft edge every frame — a shimmer instead of a settled scatter."
+			bind:checked={app.twinkle}
+		/>
 	</Section>
 {/if}
-
-<style>
-	.hint {
-		margin: 8px 0 0;
-		color: var(--color-text-dim);
-		font-size: 11px;
-		line-height: 1.4;
-	}
-</style>

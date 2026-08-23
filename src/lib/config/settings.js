@@ -1,3 +1,5 @@
+import { DEFAULT_SEQUENCE, normalizeSteps } from '../light/animation.js';
+
 /**
  * Tunable constants for the app. Slider ranges are `{min, max, step}` objects
  * consumed directly by the matching sidebar control. Add tunables here, never
@@ -43,6 +45,22 @@ export const settings = {
 	// shares of its width/height. ±0.5 sits on an edge; further is off-image.
 	waveCentre: { min: -1, max: 1, step: 0.01 },
 
+	// --- Animation mode ---
+	// How long one step of the sequence runs.
+	stepDuration: { min: 100, max: 20000, step: 50 },
+	// How far a step's geometric order is blended toward each region's own
+	// fixed threshold: 0 is a ruler-straight front, 1 is pure scatter.
+	scatter: { min: 0, max: 1, step: 0.01 },
+	// Resolution multipliers offered for the video export, against the base
+	// image's native pixel size.
+	exportScale: { options: [0.5, 1, 2] },
+	// The encoder gets unhappy well before this, and a 4K source would be
+	// recorded pointlessly large; the longest edge is capped here.
+	maxVideoDimension: 1920,
+	// A recording runs in real time, so a very long sequence would tie the tab
+	// up for as long as it plays. Refuse past this rather than appear hung.
+	maxVideoSeconds: 120,
+
 	// --- Appearance ---
 	// Cross-fade between a region's dark and lit state, in milliseconds.
 	fade: { min: 0, max: 1000, step: 10 },
@@ -66,6 +84,18 @@ export const settings = {
 	maxCurveDepth: 16 // recursion guard for the adaptive flattener
 };
 
+/**
+ * The lighting modes, in the order the sidebar's dropdown offers them. Each
+ * one owns a `light/*.js` module and (past Random) a sidebar section of its
+ * own.
+ */
+export const MODES = [
+	{ value: 'random', label: 'Random' },
+	{ value: 'interactive', label: 'Interactive' },
+	{ value: 'waves', label: 'Waves' },
+	{ value: 'animation', label: 'Animation' }
+];
+
 /** Starting values for a fresh session. */
 export const defaults = {
 	mode: 'random',
@@ -83,6 +113,11 @@ export const defaults = {
 	waveSoftness: 0.3,
 	waveCentreX: 0,
 	waveCentreY: 0,
+	// The sequence itself is a setting, so a demo can ship a whole
+	// choreography in its `settings.json` alongside the look.
+	animationSteps: normalizeSteps(DEFAULT_SEQUENCE),
+	animationLoop: true,
+	exportScale: 1,
 	showCircle: false,
 	showPaths: false,
 	pathWidth: 1,
@@ -97,11 +132,18 @@ export const defaults = {
  * Iterating `defaults` rather than the overrides means an unknown key in the
  * file is ignored instead of landing on the state: the file is data, and
  * `defaults` is the list of what it is allowed to set.
+ *
+ * The clone matters now that a setting can be a whole array of steps: a shallow
+ * copy would hand every caller the same `defaults.animationSteps`, and the
+ * first edit in the sidebar would rewrite the defaults for the session.
+ * `normalizeSteps` then does for the sequence what this function does for the
+ * flat keys — fills in what a file left out, drops what it isn't allowed to say.
  */
 export function withDefaults(overrides = {}) {
-	const resolved = { ...defaults };
+	const resolved = structuredClone(defaults);
 	for (const key of Object.keys(defaults)) {
-		if (overrides?.[key] !== undefined) resolved[key] = overrides[key];
+		if (overrides?.[key] !== undefined) resolved[key] = structuredClone(overrides[key]);
 	}
+	resolved.animationSteps = normalizeSteps(resolved.animationSteps);
 	return resolved;
 }

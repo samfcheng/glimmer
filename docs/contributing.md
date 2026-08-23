@@ -8,7 +8,8 @@ A browser tool for "hover-light" effects. You give it two images of one scene �
 one with the lights **off**, one with them **on** — plus an SVG holding one path
 per toggleable region (a window). The app composites the lit image through those
 regions, and a mode decides which are lit: **Random** (scatter, click to
-scramble) or **Interactive** (a circle chases the cursor).
+scramble), **Interactive** (a circle chases the cursor), **Waves** (a lit band
+travels across), or **Animation** (a sequence of steps, played in order).
 
 SvelteKit + Svelte 5 **runes**, client-rendered (`+page.js` sets `ssr = false`),
 plain JS with JSDoc — no TypeScript.
@@ -21,7 +22,7 @@ Everything below the shell is Glimmer's own.
 
 ```bash
 npm run dev     # vite dev server
-npm test        # vitest run (68 tests)
+npm test        # vitest run (151 tests)
 npm run build   # the real "does it compile?" gate for .svelte files
 ```
 
@@ -112,9 +113,10 @@ while getting thinner relative to the image as you zoom in.
 
 ## Lighting (`light/`)
 
-Both modes produce the same thing: `AppState.levels`, a level per region,
+Every mode produces the same thing: `AppState.levels`, a level per region,
 index-aligned with `app.regions`. It is `$state.raw` because it is replaced
-wholesale (every frame, in interactive mode) and never mutated in place.
+wholesale (every frame, in the three animated modes) and never mutated in
+place.
 
 **Random** (`light/random.js`) — each region gets a roll from the current seed;
 lit when the roll is under Lit Chance. Rolls stay fixed until the next scramble
@@ -151,9 +153,86 @@ threshold — so the wavefront's scattered edge travels with it rather than
 shimmering in place. The coordinates are `$derived`, not recomputed per frame;
 only the scene and the direction change them.
 
-Both loops take their step from `frameDelta` (`light/clock.js`), which is
+**Animation** (`light/animation.js`) — a sequence of steps played in order, and
+the largest of the four. Its one idea is worth stating plainly, because almost
+every animation in the library is the *same* animation with a different sort
+order:
+
+```js
+level[i] = progress >= arrival[i] ? target : whateverItWasBefore
+```
+
+A step's **arrival order** gives each region the fraction of the step at which
+it flips. Fade is arrival-by-random-number, Wipe is arrival-by-position-along-an-
+axis, Ripple is arrival-by-distance-from-a-point, Spiral winds those two
+together. `ORDERS` is therefore nine one-liners, and playback never learns what
+any of them mean — which is why adding an animation is a change to
+`animation.js` and nothing else. Four kinds aren't transitions at all (Hold,
+Twinkle, Chase, Strobe); they are marked `sustained: true` and write levels
+directly.
+
+Three further decisions hold the mode up:
+
+- **The sequence composes.** The timeline starts fully dark and each step
+  transitions from whatever the last one left behind, so `Fade on → Hold → Wipe
+  off` reads as one choreography rather than three clips. `sequenceStarts` folds
+  the whole timeline up front — every step's end state is a pure function of its
+  start state — which is what makes any moment **seekable** without having
+  played the moments before it. The scrubber, a loop restart, and the video
+  export all agree on a given millisecond because none of them accumulates
+  anything.
+- **`scatter` is one dial for organic-ness.** It blends a step's geometric order
+  toward each region's own fixed import-time `threshold`, so a wipe frays into a
+  scattered front and *stays* frayed the same way frame after frame. Same
+  reasoning as the interactive mode's soft edge, applied to every pattern at
+  once. Fade's order already *is* the threshold, so it opts out via
+  `randomOrder`.
+- **The library is data.** Each entry in `ANIMATION_KINDS` declares its own
+  `controls` (`slider`/`select`/`toggle` descriptors, with `format` naming a
+  display pair rather than carrying a function so a step survives the round trip
+  through a demo's `settings.json`). `AnimationStepPanel.svelte` renders whatever
+  the chosen kind asks for.
+
+`normalizeStep` is the boundary for step data the same way `withDefaults` is for
+the flat settings: an unknown kind falls back to Fade, unknown options are
+dropped, nonsense values are clamped, and an existing `id` is kept so
+re-normalising a live sequence doesn't churn the list's `{#each}` keys.
+
+`Stage.svelte`'s loop for this mode only advances a clock — every frame is a
+`sequenceLevels(timeMs)` lookup. It runs whether or not playback is going, so
+editing a step's settings while paused updates the stage live.
+
+All three loops take their step from `frameDelta` (`light/clock.js`), which is
 extracted precisely so the stepping rules — first frame, clamped long gap,
 clock running backwards — are unit-testable. A browser's rAF clock is not.
+
+## Video export (`render/export.js`)
+
+The stage draws with SVG; the export draws the same scene with canvas, because
+`MediaRecorder` records a canvas stream and nothing else. They are two
+implementations of one picture, so the places they could drift apart are
+commented at the point they occur:
+
+- Canvas has no `mask` attribute, so the mask is painted on its own canvas and
+  applied to the lit image with `destination-in`.
+- Region padding is a *screen* px measurement; in an export the output pixel is
+  the screen pixel, so it is converted out of frame units by the same scale the
+  context applies.
+- Element `opacity` composites a region's fill and its padding stroke as one
+  group; canvas has no equivalent, so a region caught mid-fade gets a slightly
+  brighter rim. One padding-pixel wide, one `fadeMs` long, and buying it back
+  would cost a full-canvas pass per distinct level.
+- `approachLevels` re-implements the CSS `transition: opacity var(--fade)` that
+  the stage gets for free — without it an exported Fade would snap every window
+  on while the stage cross-faded them.
+
+What the two *do* share is the part that matters: levels come from
+`sequenceLevels`, the same pure function the frame loop calls. The export
+replays the animation rather than re-deriving it.
+
+Recording runs in **real time** — that is the price of the browser's own
+encoder — so `settings.maxVideoSeconds` refuses a sequence long enough to look
+like a hang, and the button says so.
 
 ## SVG import (`svg/`)
 
@@ -209,13 +288,49 @@ Appearance — the effect sections would be settings for nothing. Appearance sta
 because it carries the theme, which is a device preference rather than scene
 state.
 
+## Explaining a control
+
+`Slider`, `Toggle`, `Select` and `Section` all take an optional `info` string,
+which renders a small **ⓘ** beside the label with the text behind a tooltip
+(`ui/InfoTip.svelte`, on bits-ui's `Tooltip`). Prefer it to a `<p class="hint">`:
+a 280px panel can only carry so much prose before the controls stop being
+findable, and most explanations are read once and never again.
+
+The tooltip is **portalled** and opens to the **left**, both because the sidebar
+scrolls — `overflow-y: auto` computes `overflow-x` to `auto` as well, so anything
+positioned inside the panel is clipped at its edge — and because there is nothing
+but panel to the right. Its trigger stops click propagation, since the icon often
+sits inside something clickable (a `Section` header toggles on click).
+
+A `hint` paragraph is still right for one thing: saying why a control is
+*disabled*, which a tooltip on a dead button can't do. `ExportSection` uses one
+that way.
+
+## Adding an animation — the checklist
+
+All in `light/animation.js`:
+
+1. A one-line entry in `ORDERS` (a transition) or `SUSTAINED` (something that
+   runs for the step's length). Transitions return one raw number per region;
+   scale doesn't matter, `arrivalsFor` normalises.
+2. An entry in `ANIMATION_KINDS`: label, hint, default `durationMs`, default
+   `options`, and the `controls` that edit them.
+3. A test in `animation.test.js`. The "every transition spans [0,1]" and "lands
+   on the target by the end" cases cover new kinds automatically; add one for
+   whatever is specific about yours.
+
+No component changes: the panel renders from `controls`, and the dropdown from
+`ANIMATION_KINDS`.
+
 ## Adding a control — the checklist
 
 1. `config/settings.js`: the slider range, plus a starting value in `defaults`.
    Never inline a range in a component.
 2. `state/app.svelte.js`: a `$state` field (and a getter if it needs deriving).
 3. The relevant `components/sidebar/*Section.svelte`: the control itself, using
-   the `ui/` primitives (`Slider`, `Toggle`, `SegmentedToggle`, `Section`).
+   the `ui/` primitives (`Slider`, `Toggle`, `SegmentedToggle`, `Section`). If it
+   needs explaining, pass `info="…"` rather than writing a paragraph under it —
+   see below.
 4. `light/*.js`: read it in the pure function, not in the component.
 5. A test in the matching `*.test.js`.
 
@@ -231,7 +346,8 @@ components/toolbar/FloatingToolbar.svelte  scramble / reset view / collapse
 components/ui/*                   primitives (Select is Glimmer's own)
 config/settings.js                every range and default
 config/demos.js                   the bundled demos, and where their files live
-light/{random,interactive,waves}.js  the three modes, as pure functions
+light/{random,interactive,waves,animation}.js  the four modes, as pure functions
+render/export.js                  the animation, recorded to video via canvas
 light/{clock,rng}.js              frame stepping, seeded RNG
 svg/{regions,path-data,matrix,shapes}.js  SVG -> regions
 geometry/transform.js             frame <-> screen
@@ -250,7 +366,16 @@ state/{app,theme}.svelte.js       the store, and the theme preference
   and up disagree is never dispatched, so the button silently does nothing.
   Anything non-interactive floating over the stage should just be
   `pointer-events: none`.
+- `withDefaults` **deep-clones**. `animationSteps` is a whole array of objects,
+  and a shallow copy would hand every caller the same steps — the first sidebar
+  edit would then rewrite `defaults` for the session.
+- The animation step list's drag-to-reorder is pointer events, not HTML5
+  drag-and-drop, for the reason the particle playground's layers panel gives:
+  native DnD leaks a translucent row ghost and a link cursor that no browser
+  lets you suppress.
 - Keyboard: **R** refits the view, **⌘/Ctrl + \\** collapses the sidebar, and
-  holding **Space** turns a drag into a pan. All of them are ignored while a
+  holding **Space** turns a drag into a pan — except in Animation mode, where
+  Space is the transport instead. Nothing is given up for that: `spaceHeld` only
+  ever set the grab cursor, and a drag pans in every mode with or without it. All of them are ignored while a
   text field has focus. Collapsing also hides the floating toolbar — the stage
   goes fully chrome-free — so **⌘/Ctrl + \\** is the only way back in.

@@ -2,6 +2,14 @@ import { getContext, setContext } from 'svelte';
 import { defaults, withDefaults } from '../config/settings.js';
 import { demoAsset, demoFiles, findDemo } from '../config/demos.js';
 import { randomLevels, rollRegions } from '../light/random.js';
+import {
+	animationLayout as buildAnimationLayout,
+	arrivalsFor,
+	createStep,
+	normalizeSteps,
+	sequenceStarts,
+	totalDuration
+} from '../light/animation.js';
 import { parseSvgRegions } from '../svg/regions.js';
 
 const emptyImage = () => ({ url: null, naturalWidth: 0, naturalHeight: 0, file: null, name: null });
@@ -57,11 +65,24 @@ export class AppState {
 	waveSoftness = $state(defaults.waveSoftness);
 	waveCentreX = $state(defaults.waveCentreX);
 	waveCentreY = $state(defaults.waveCentreY);
+	/** The animation sequence, played top to bottom. Its own copy — never the array in `defaults`. */
+	animationSteps = $state(normalizeSteps(defaults.animationSteps));
+	animationLoop = $state(defaults.animationLoop);
+	exportScale = $state(defaults.exportScale);
 	showCircle = $state(defaults.showCircle);
 	showPaths = $state(defaults.showPaths);
 	pathWidth = $state(defaults.pathWidth);
 	fadeMs = $state(defaults.fadeMs);
 	regionPaddingPx = $state(defaults.regionPaddingPx);
+
+	/**
+	 * Playhead and transport for animation mode. Session state, not settings —
+	 * a demo describes a sequence, not where someone had paused it.
+	 */
+	animationTimeMs = $state(0);
+	animationPlaying = $state(true);
+	/** Which step's settings panel is open in the sidebar, or null. */
+	openStepId = $state(null);
 
 	/** Seed behind the current random-mode rolls; bumping it is a scramble. */
 	seed = $state(Math.floor(Math.random() * 0xffffffff));
@@ -168,6 +189,9 @@ export class AppState {
 	applySettings(overrides) {
 		const resolved = withDefaults(overrides);
 		for (const [key, value] of Object.entries(resolved)) this[key] = value;
+		// A new sequence arrived, so the playhead into the old one means nothing.
+		this.animationTimeMs = 0;
+		this.openStepId = null;
 	}
 
 	// --- Demos ----------------------------------------------------------
@@ -235,6 +259,95 @@ export class AppState {
 
 	applyRandomLevels() {
 		this.levels = randomLevels(rollRegions(this.regions.length, this.seed), this.litChance);
+	}
+
+	// --- Animation ------------------------------------------------------
+	//
+	// Three `$derived`s stand between the sequence and the frame loop. The loop
+	// runs sixty times a second and none of these change on a frame boundary —
+	// only when the scene or a step's settings do — so deriving them here is
+	// what keeps playback down to one array map per frame.
+
+	/** Every region's centroid as a fraction of the frame — the only geometry the animations see. */
+	animationLayout = $derived(buildAnimationLayout(this.svg.regions, this.frame));
+
+	/** Per step, the moment each region flips. Null for the sustained kinds, which have no order. */
+	animationArrivals = $derived(
+		this.animationSteps.map((step) => arrivalsFor(step, this.animationLayout))
+	);
+
+	/** Per step, the levels it begins from — the timeline folded up from an all-dark opening. */
+	animationStarts = $derived(sequenceStarts(this.animationSteps, this.animationLayout));
+
+	animationDuration = $derived(totalDuration(this.animationSteps));
+
+	/** Appends a step and opens its panel, since a new step is always one you're about to set up. */
+	addStep(kind = 'fade') {
+		const step = createStep(kind);
+		this.animationSteps = [...this.animationSteps, step];
+		this.openStepId = step.id;
+		return step;
+	}
+
+	duplicateStep(id) {
+		const index = this.animationSteps.findIndex((step) => step.id === id);
+		if (index === -1) return;
+		// `$state.snapshot` is what detaches the copy from the original's proxy —
+		// without it the two steps would share their `options` object and edit
+		// each other.
+		const copy = { ...$state.snapshot(this.animationSteps[index]), id: createStep().id };
+		this.animationSteps = this.animationSteps.toSpliced(index + 1, 0, copy);
+		this.openStepId = copy.id;
+	}
+
+	/**
+	 * Switches a step to a different animation, resetting its options to the
+	 * new kind's own defaults — the old ones described a different pattern, and
+	 * `normalizeStep` would drop them anyway.
+	 */
+	setStepKind(id, kind) {
+		const index = this.animationSteps.findIndex((step) => step.id === id);
+		if (index === -1 || this.animationSteps[index].kind === kind) return;
+		const fresh = createStep(kind);
+		this.animationSteps[index] = {
+			...fresh,
+			id,
+			// Duration, direction and easing describe the step, not the pattern,
+			// so they survive a change of mind about which pattern it is.
+			durationMs: this.animationSteps[index].durationMs,
+			direction: this.animationSteps[index].direction,
+			easing: this.animationSteps[index].easing,
+			scatter: this.animationSteps[index].scatter
+		};
+	}
+
+	removeStep(id) {
+		this.animationSteps = this.animationSteps.filter((step) => step.id !== id);
+		if (this.openStepId === id) this.openStepId = null;
+	}
+
+	/** Reorders the sequence to match `ids` — what the list's drag-to-reorder commits. */
+	setStepOrder(ids) {
+		const byId = new Map(this.animationSteps.map((step) => [step.id, step]));
+		const reordered = ids.map((id) => byId.get(id)).filter(Boolean);
+		if (reordered.length !== this.animationSteps.length) return;
+		this.animationSteps = reordered;
+	}
+
+	/**
+	 * Jumps the playhead to the start of a step. Editing a step you can't see
+	 * is guesswork, so opening a panel scrubs to it.
+	 */
+	seekToStep(id) {
+		const index = this.animationSteps.findIndex((step) => step.id === id);
+		if (index === -1) return;
+		this.animationTimeMs = this.animationSteps
+			.slice(0, index)
+			.reduce((sum, step) => sum + Math.max(0, step.durationMs), 0);
+	}
+
+	restartAnimation() {
+		this.animationTimeMs = 0;
 	}
 }
 

@@ -1,4 +1,5 @@
 <script>
+	import InfoTip from './InfoTip.svelte';
 	import { Slider } from 'bits-ui';
 	import EditableValue from './EditableValue.svelte';
 
@@ -17,7 +18,9 @@
 		// Inverse of `formatValue` — e.g. for a slider displayed as "30%" but
 		// stored as 0.3, this should turn typed text back into the 0.3 scale.
 		parseValue = (text) => parseFloat(text),
-		onValueChange = null
+		onValueChange = null,
+		// Optional one-line explanation, shown behind an "i" beside the label.
+		info = null
 	} = $props();
 
 	function handleValueChange(next) {
@@ -54,7 +57,10 @@
 
 <div class="row" class:disabled>
 	<div class="row-header">
-		<span class="label">{label}</span>
+		<span class="label label-with-info">
+			{label}
+			{#if info}<InfoTip text={info} />{/if}
+		</span>
 		<EditableValue
 			text={formatValue(value)}
 			onCommit={commitTypedValue}
@@ -85,6 +91,14 @@
 </div>
 
 <style>
+	/* Label plus its optional info icon, so the icon sits with the text rather
+	   than floating at the end of the row. */
+	.label-with-info {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+
 	.row {
 		padding: var(--space-xs) 0;
 	}

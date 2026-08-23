@@ -1,0 +1,7 @@
+{
+	"mode": "waves",
+	"waveDirection": "up",
+	"waveSpeed": 0.7,
+	"waveLength": 0.2,
+	"waveBand": 0.6
+}

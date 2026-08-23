@@ -10,7 +10,10 @@
  * Static assets can't be listed at runtime, so a new demo needs a line here as
  * well as its folder.
  */
-export const demos = [{ slug: 'transamerica_pyramid', label: 'Transamerica Pyramid' }];
+export const demos = [
+	{ slug: 'transamerica_pyramid', label: 'Transamerica Pyramid' },
+	{ slug: 'la_graffiti_towers', label: 'LA Graffiti Towers' }
+];
 
 /** The fixed file names inside a demo folder. */
 export const demoFiles = {

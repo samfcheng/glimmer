@@ -4,7 +4,10 @@
 	import {
 		IconDice5,
 		IconFocusCentered,
-		IconLayoutSidebarRightCollapse
+		IconLayoutSidebarRightCollapse,
+		IconPlayerPause,
+		IconPlayerPlay,
+		IconPlayerSkipBack
 	} from '@tabler/icons-svelte-runes';
 
 	let { onResetView } = $props();
@@ -17,7 +20,7 @@
 	included, so the scene gets the whole window. Every button here has a
 	keyboard or pointer equivalent that still works while it is hidden —
 	⌘/Ctrl + \ brings the sidebar (and the toolbar with it) back, R refits the
-	view, and clicking the image scrambles.
+	view, Space plays/pauses an animation, and clicking the image scrambles.
 -->
 {#if app.sidebarOpen}
 	<div class="toolbar" data-stage-ui>
@@ -27,6 +30,21 @@
 				onclick={() => app.scramble()}
 			>
 				<IconDice5 size={18} />
+			</IconButton>
+		{/if}
+		{#if app.mode === 'animation'}
+			<IconButton
+				title={app.animationPlaying ? 'Pause (Space)' : 'Play (Space)'}
+				onclick={() => (app.animationPlaying = !app.animationPlaying)}
+			>
+				{#if app.animationPlaying}
+					<IconPlayerPause size={18} />
+				{:else}
+					<IconPlayerPlay size={18} />
+				{/if}
+			</IconButton>
+			<IconButton title="Back to the start" onclick={() => app.restartAnimation()}>
+				<IconPlayerSkipBack size={18} />
 			</IconButton>
 		{/if}
 		<IconButton title="Reset view (R)" onclick={onResetView}>

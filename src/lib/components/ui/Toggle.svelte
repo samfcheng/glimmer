@@ -1,17 +1,34 @@
 <script>
+	import InfoTip from './InfoTip.svelte';
 	import { Switch } from 'bits-ui';
 
-	let { label, checked = $bindable(false) } = $props();
+	let {
+		label,
+		checked = $bindable(false),
+		// Optional one-line explanation, shown behind an "i" beside the label.
+		info = null
+	} = $props();
 </script>
 
 <label class="row">
-	<span class="label">{label}</span>
+	<span class="label label-with-info">
+		{label}
+		{#if info}<InfoTip text={info} />{/if}
+	</span>
 	<Switch.Root bind:checked class="switch-root">
 		<Switch.Thumb class="switch-thumb" />
 	</Switch.Root>
 </label>
 
 <style>
+	/* Label plus its optional info icon, so the icon sits with the text rather
+	   than floating at the end of the row. */
+	.label-with-info {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+
 	.row {
 		display: flex;
 		align-items: center;

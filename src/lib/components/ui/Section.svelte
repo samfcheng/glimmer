@@ -1,8 +1,11 @@
 <script>
 	import { IconChevronDown } from '@tabler/icons-svelte-runes';
+	import InfoTip from './InfoTip.svelte';
 
 	let {
 		title,
+		// Optional one-line explanation, shown behind an "i" beside the title.
+		info = null,
 		action = null,
 		children,
 		collapsible = true,
@@ -37,7 +40,10 @@
 		role="button"
 		tabindex="0"
 	>
-		<h3>{title}</h3>
+		<h3>
+			{title}
+			{#if info}<InfoTip text={info} />{/if}
+		</h3>
 		<div class="header-actions">
 			{#if action}
 				{@render action()}
@@ -72,6 +78,9 @@
 	}
 
 	h3 {
+		display: flex;
+		align-items: center;
+		gap: 4px;
 		margin: 0;
 		font-size: 12px;
 		font-weight: 500;
