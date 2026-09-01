@@ -6,6 +6,7 @@
 	import ModeSection from './ModeSection.svelte';
 	import InteractiveSection from './InteractiveSection.svelte';
 	import WavesSection from './WavesSection.svelte';
+	import MusicSection from './MusicSection.svelte';
 	import AnimationSection from './AnimationSection.svelte';
 	import ExportSection from './ExportSection.svelte';
 	import AppearanceSection from './AppearanceSection.svelte';
@@ -30,6 +31,7 @@
 		<ModeSection />
 		<InteractiveSection />
 		<WavesSection />
+		<MusicSection />
 		<AnimationSection />
 		<ExportSection />
 	{/if}

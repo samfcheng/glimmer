@@ -31,7 +31,7 @@
 				frame: app.frame,
 				regions: app.regions,
 				steps: app.animationSteps,
-				layout: app.animationLayout,
+				layout: app.regionLayout,
 				fadeMs: app.fadeMs,
 				regionPaddingPx: app.regionPaddingPx,
 				scale: app.exportScale,

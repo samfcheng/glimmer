@@ -5,6 +5,8 @@
 	import { easeToward, interactiveLevels, levelsMatch } from '$lib/light/interactive.js';
 	import { waveCoordinates, waveLevels } from '$lib/light/waves.js';
 	import { sequenceLevels } from '$lib/light/animation.js';
+	import { musicLevels } from '$lib/light/music.js';
+	import { createAnalysis } from '$lib/audio/analysis.js';
 	import { frameDelta } from '$lib/light/clock.js';
 	import Scene from './Scene.svelte';
 	import CursorCircle from './CursorCircle.svelte';
@@ -148,6 +150,64 @@
 		return () => cancelAnimationFrame(frameId);
 	});
 
+	// Music mode: the loop reads the analyser instead of a clock. The stateful
+	// part of the audio (the envelope follower, auto-gain) lives in the
+	// `createAnalysis()` object, which belongs to this effect — leaving the mode
+	// and coming back starts from silence rather than from a stale envelope.
+	//
+	// It runs whether or not the track is playing: a paused analyser reads
+	// silence, so the scene settles to dark on its own, and the sliders stay
+	// live while you dial them in against a stopped track.
+	$effect(() => {
+		if (app.mode !== 'music') return;
+
+		const analysis = createAnalysis();
+		let frameId = 0;
+		let lastTime = 0;
+
+		const tick = (time) => {
+			frameId = requestAnimationFrame(tick);
+			const dt = frameDelta(lastTime, time);
+			lastTime = time;
+
+			app.audio.sync();
+			const reading = analysis.step(app.audio.read(), dt, {
+				driver: app.musicDriver,
+				decayMs: app.musicDecayMs
+			});
+			// The sidebar's meter shows what is on the wire, so it is fed from
+			// here rather than deriving anything of its own.
+			app.audio.meterLeft = reading.rms.left;
+			app.audio.meterRight = reading.rms.right;
+
+			const next = musicLevels(app.musicVisual, app.regionLayout, reading, {
+				stereo: app.musicStereo,
+				base: app.musicBase,
+				churn: app.musicChurn,
+				// The hit counter is the seed, so the scatter lands somewhere new
+				// on each beat and holds there while the light fades.
+				seed: reading.hits,
+				softness: app.musicSoftness,
+				direction: app.musicDirection,
+				mirror: app.musicMirror,
+				amplitude: app.musicAmplitude,
+				thickness: app.musicThickness,
+				minHz: settings.musicMinHz,
+				maxHz: settings.musicMaxHz
+			});
+			if (!levelsMatch(next, app.levels)) app.levels = next;
+		};
+
+		frameId = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(frameId);
+	});
+
+	// Leaving music mode stops the music. Its own effect, depending on nothing
+	// but the mode, so changing a slider can't pause the track mid-dial.
+	$effect(() => {
+		if (app.mode !== 'music') app.audio.pause();
+	});
+
 	// Animation mode: the same shape again, but the loop only advances a clock
 	// — every frame is `sequenceLevels(timeMs)`, a pure lookup. Nothing
 	// accumulates, which is what lets the scrubber, a loop restart and the
@@ -183,7 +243,7 @@
 				}
 			}
 
-			const next = sequenceLevels(app.animationSteps, app.animationLayout, app.animationTimeMs, {
+			const next = sequenceLevels(app.animationSteps, app.regionLayout, app.animationTimeMs, {
 				loop: app.animationLoop,
 				starts: app.animationStarts,
 				arrivals: app.animationArrivals
@@ -301,6 +361,8 @@
 			// the grab cursor — a drag pans in every mode with or without it.
 			if (app.mode === 'animation') {
 				if (!event.repeat) app.animationPlaying = !app.animationPlaying;
+			} else if (app.mode === 'music') {
+				if (!event.repeat) app.audio.toggle();
 			} else if (!spaceHeld) {
 				spaceHeld = true;
 			}
@@ -359,6 +421,16 @@
 		}
 		if (file.type.startsWith('image/')) {
 			await app.setImage(app.base.url && !app.active.url ? 'active' : 'base', file);
+			return;
+		}
+		// Dropping audio switches to music mode as well as loading it: there is
+		// nothing else a track could be for, and landing on a mode that ignores
+		// it would just look like the drop had failed.
+		if (file.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name)) {
+			app.mode = 'music';
+			await app.audio.setFile(file);
+			if (!app.audio.error) app.audio.play();
+			else dropError = app.audio.error;
 		}
 	}
 
@@ -404,7 +476,7 @@
 		<div class="empty">{emptyMessage}</div>
 	{/if}
 	{#if isDraggingFile}
-		<div class="drop-hint">Drop an image or an SVG</div>
+		<div class="drop-hint">Drop an image, an SVG, or an audio file</div>
 	{/if}
 	{#if dropError}
 		<div class="drop-error">{dropError}</div>

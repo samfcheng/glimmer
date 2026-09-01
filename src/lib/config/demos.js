@@ -30,3 +30,13 @@ export function findDemo(slug) {
 export function demoAsset(slug, file) {
 	return `/demos/${slug}/${file}`;
 }
+
+/**
+ * A bundled audio clip, so music mode has something to play before anyone
+ * uploads a track — the same reason the demos exist. Same deal as a demo: a
+ * static file can't be discovered at runtime, so it is named here.
+ */
+export const audioSample = {
+	url: '/samples/lie2me_dcthedon_sample.mp3',
+	label: 'Lie 2 Me — DC The Don'
+};

@@ -1,0 +1,200 @@
+/*
+ * Editor design tokens, base rules and shared utility classes.
+ *
+ * Imported by Editor.svelte, so dropping the folder in is the whole install —
+ * there is nothing to wire up in your app's global stylesheet.
+ *
+ * Every token is prefixed `--editor-` and every utility class `.editor-`, so
+ * the folder can land in a project that already has its own `--color-text` or
+ * `.button` without either side clobbering the other. To restyle the editor,
+ * redefine the tokens you care about *after* this file loads — a `:root` rule
+ * in your own CSS, or a rule on any ancestor of the editor for a local override.
+ */
+
+:root {
+	/* ── Surfaces ── */
+	--editor-color-bg: #222222; /* the canvas behind your content */
+	--editor-color-panel: #2a2a2a; /* sidebar, toolbar, tooltips, popups */
+	--editor-color-panel-border: #373737;
+
+	/* ── Text ── */
+	--editor-color-text: #e4e4e7; /* control labels, values */
+	--editor-color-text-muted: #8b8b92; /* icons at rest, empty-state copy */
+	--editor-color-text-dim: rgba(255, 255, 255, 0.57); /* inactive segments, hints */
+	--editor-color-heading: rgba(255, 255, 255, 0.9); /* section titles */
+
+	/* ── Accents ── */
+	--editor-color-accent: #3b9eff; /* active toggles, focus, drop target */
+	--editor-color-accent-text: #ffffff; /* text/icon sitting on the accent */
+	--editor-color-danger: #ff5c5c;
+
+	/* ── Control internals ── */
+	--editor-color-input-bg: #373737;
+	--editor-color-track: rgba(255, 255, 255, 0.1);
+	--editor-color-track-fill: rgba(255, 255, 255, 0.25);
+	--editor-color-thumb: #f9f9f9;
+	--editor-color-thumb-shadow: transparent;
+	--editor-color-toggle-group-bg: rgba(255, 255, 255, 0.05);
+	--editor-color-toggle-active-bg: rgba(255, 255, 255, 0.08);
+	--editor-color-hover: rgba(255, 255, 255, 0.1);
+	--editor-color-shadow: rgba(0, 0, 0, 0.2);
+
+	/* ── Metrics ── */
+	--editor-radius-sm: 6px;
+	--editor-radius-md: 10px;
+	--editor-radius-lg: 14px;
+	--editor-space-xs: 4px;
+	--editor-space-sm: 8px;
+	--editor-space-md: 12px;
+	--editor-space-lg: 20px;
+	--editor-font-sans:
+		-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+	--editor-font-size: 13px;
+	--editor-control-font-size: 12px;
+
+	/* Collapse/expand speeds. Set either to `0s` for instant, no-motion UI. */
+	--editor-section-duration: 0.18s;
+	--editor-sidebar-duration: 0.2s;
+}
+
+/*
+ * Light theme. Written as a plain attribute selector rather than `:root[...]`
+ * so it works both on <html> (whole-page theming, what ThemeState does) and on
+ * any wrapper element (one editor light while the rest of the page stays dark).
+ */
+[data-theme='light'] {
+	--editor-color-bg: #ececee;
+	--editor-color-panel: #f7f7f8;
+	--editor-color-panel-border: #e0e0e3;
+	--editor-color-text: #27272b;
+	--editor-color-text-muted: #77777f;
+	--editor-color-text-dim: rgba(0, 0, 0, 0.55);
+	--editor-color-heading: rgba(0, 0, 0, 0.88);
+	--editor-color-danger: #e5484d;
+	--editor-color-input-bg: #e6e6ea;
+	--editor-color-track: rgba(0, 0, 0, 0.08);
+	--editor-color-track-fill: rgba(0, 0, 0, 0.24);
+	--editor-color-thumb: #ffffff;
+	--editor-color-thumb-shadow: rgba(0, 0, 0, 0.35);
+	--editor-color-toggle-group-bg: rgba(0, 0, 0, 0.05);
+	--editor-color-toggle-active-bg: #ffffff;
+	--editor-color-hover: rgba(0, 0, 0, 0.06);
+	--editor-color-shadow: rgba(0, 0, 0, 0.14);
+}
+
+/*
+ * Scoped reset. Deliberately not `* { box-sizing: border-box }` — a drop-in
+ * component has no business resetting the host page, so the rules stop at the
+ * editor's own subtree. `interpolate-size` is what lets a section animate to
+ * `height: auto`; where it is unsupported the section simply snaps.
+ */
+.editor,
+.editor *,
+.editor *::before,
+.editor *::after {
+	box-sizing: border-box;
+}
+
+.editor {
+	interpolate-size: allow-keywords;
+	font-family: var(--editor-font-sans);
+	font-size: var(--editor-font-size);
+	color: var(--editor-color-text);
+}
+
+/* ── Utilities ──────────────────────────────────────────────────────────────
+   Shared control styling, declared once here instead of being re-invented in
+   each panel section you write. Building a new section should mean reaching
+   for these classes rather than another near-identical block of scoped CSS.
+   Hover is a uniform opacity fade: a background swap reads inconsistently
+   across the differently-tinted surfaces these controls sit on. */
+
+.editor-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+	height: 24px;
+	padding: 0 8px;
+	border: none;
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-color-toggle-group-bg);
+	color: var(--editor-color-text);
+	font-family: inherit;
+	font-size: var(--editor-control-font-size);
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: opacity 0.12s ease;
+}
+
+.editor-button:hover:not(:disabled),
+.editor-button.is-active {
+	opacity: 0.9;
+}
+
+.editor-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.editor-button.is-danger {
+	color: var(--editor-color-danger);
+}
+
+/* Buttons sitting side by side, splitting the width evenly. */
+.editor-button-row {
+	display: flex;
+	align-items: stretch;
+	gap: 6px;
+}
+
+.editor-button-row > .editor-button {
+	flex: 1;
+	min-width: 0;
+}
+
+/* Matches the label a Slider/SegmentedToggle renders above itself, so a bare
+   control group lines up with the built-in ones. */
+.editor-control-label {
+	display: block;
+	margin: 6px 0 2px;
+	color: var(--editor-color-text);
+	font-size: var(--editor-control-font-size);
+}
+
+/* Small print under a control — a caveat, a validation note, a legend. */
+.editor-hint {
+	margin: 6px 0 0;
+	color: var(--editor-color-text-dim);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+/* Floating panel anchored beside the sidebar. Positioning is set inline by
+   the caller, since only it knows what the panel is anchored to. */
+.editor-popup {
+	position: fixed;
+	z-index: 100;
+	background: var(--editor-color-panel);
+	border: 1px solid var(--editor-color-panel-border);
+	border-radius: var(--editor-radius-sm);
+	box-shadow: 0 4px 12px var(--editor-color-shadow);
+	overflow: hidden;
+}
+
+.editor-popup-header {
+	padding: 8px 12px 9px;
+	border-bottom: 1px solid var(--editor-color-panel-border);
+	font-size: var(--editor-control-font-size);
+	font-weight: 500;
+	color: var(--editor-color-text);
+}
+
+.editor-popup-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 12px 12px;
+}

@@ -9,7 +9,8 @@ one with the lights **off**, one with them **on** — plus an SVG holding one pa
 per toggleable region (a window). The app composites the lit image through those
 regions, and a mode decides which are lit: **Random** (scatter, click to
 scramble), **Interactive** (a circle chases the cursor), **Waves** (a lit band
-travels across), or **Animation** (a sequence of steps, played in order).
+travels across), **Music** (the scene is lit by an audio file), or **Animation**
+(a sequence of steps, played in order).
 
 SvelteKit + Svelte 5 **runes**, client-rendered (`+page.js` sets `ssr = false`),
 plain JS with JSDoc — no TypeScript.
@@ -22,14 +23,14 @@ Everything below the shell is Glimmer's own.
 
 ```bash
 npm run dev     # vite dev server
-npm test        # vitest run (151 tests)
+npm test        # vitest run (252 tests)
 npm run build   # the real "does it compile?" gate for .svelte files
 ```
 
 - There is **no** `svelte-check`; `npm run build` is the compile gate.
 - **Vitest deliberately skips the SvelteKit vite plugin** (it crashes vitest at
   startup) — see `vitest.config.js`. Tests therefore only import plain logic:
-  `svg/`, `light/`, `geometry/`, `utils/`. They do **not** import `.svelte`
+  `svg/`, `light/`, `audio/analysis.js`, `geometry/`, `utils/`. They do **not** import `.svelte`
   components or `*.svelte.js` runes modules. Keep testable logic in plain `.js`
   so it stays covered. The environment is `jsdom` because the SVG importer needs
   `DOMParser`.
@@ -115,7 +116,7 @@ while getting thinner relative to the image as you zoom in.
 
 Every mode produces the same thing: `AppState.levels`, a level per region,
 index-aligned with `app.regions`. It is `$state.raw` because it is replaced
-wholesale (every frame, in the three animated modes) and never mutated in
+wholesale (every frame, in the four animated modes) and never mutated in
 place.
 
 **Random** (`light/random.js`) — each region gets a roll from the current seed;
@@ -153,8 +154,111 @@ threshold — so the wavefront's scattered edge travels with it rather than
 shimmering in place. The coordinates are `$derived`, not recomputed per frame;
 only the scene and the direction change them.
 
+**Music** (`light/music.js` + `audio/`) — the scene is lit by a playing audio
+file. Four layers, split along the line the rest of the codebase draws between
+pure logic, browser APIs, and reactive state:
+
+```
+audio/engine.js       AudioContext, <audio>, two analyser nodes   (untestable)
+audio/analysis.js     onsets, band energy, range, envelope, triggering (pure)
+light/music.js        the four visualisers                        (pure)
+state/audio.svelte.js the loaded track and its transport          (runes)
+```
+
+The graph is `<audio> → MediaElementSource → upmix → { destination, beat
+analyser, splitter → analyser L / analyser R }`. The **upmix** node is not
+decoration: a channel
+splitter interprets its channels *discretely*, so a mono file would leave the
+second output silent — passing through a node that asks for exactly two speaker
+channels duplicates mono into both first, which is what lets the stereo
+visualisers degrade to a symmetric picture with nothing special-cased.
+
+Every visualiser is the same two-step shape the rest of `light/` uses: a number
+from the geometry, compared against a number from the audio. Pulse is *exactly*
+Random mode with the music holding the Lit Chance slider; Level compares a fill
+coordinate against how far the meter has filled; Spectrum maps x to a
+(logarithmic) frequency and y to a bar height; Scope compares distance from a
+traced line. All four dither their edge against the same fixed per-region
+`threshold` the interactive circle and the wavefront use, so a soft edge
+settles instead of shimmering.
+
+The driver chain is three steps, and the first two are where the mode lives or
+dies:
+
+```
+measure (flux or band energy) → stretch to the full range → shape the envelope
+```
+
+- **Measure: onsets, not loudness.** `spectralFlux` sums how much each bin got
+  *louder* since the last frame. Only rises count, which is the whole trick: a
+  hit is energy appearing where there was less a moment ago, while the 808
+  sustaining underneath contributes nothing because it isn't changing. Band
+  *energy* cannot tell those apart, so on modern music an energy-driven scene
+  sits near its ceiling all bar and barely moves on the beat. Flux gets its own
+  analyser node with `smoothingTimeConstant = 0` — smoothing spreads a kick's
+  10 ms rise over 50 ms and flattens the exact spike being looked for, so the
+  beat gets raw data and the display analysers keep their smoothing. **Beat**
+  runs flux over the whole spectrum rather than the low end, which is what lets
+  it find the music in a passage with no drums: an intro of piano or synth is
+  nothing but note onsets, and a low-end-only detector shows nothing at all
+  through it. **Kick** is the narrowed version, kept as its own driver.
+- **Stretch: a range, not a peak.** `createRangeNormalizer` tracks an
+  exponentially-weighted mean and deviation and calls `mean ± 1.3σ` the range.
+  Its docblock lists the three versions that came before it and how each failed,
+  which is the most useful thing in this file to read before changing it — the
+  short version is that peak normalisation compresses a dB-mapped mix into the
+  top third of the range, min/max tracking gets its floor set by outliers on
+  skewed material and reads as permanently lit, and direct quantile estimators
+  are correct but converge an order of magnitude too slowly to be usable inside
+  one song. The spectrum bars get the same treatment via
+  `spectrumFloor`/`spectrumScale`.
+- **One range, applied to every channel.** It is learned from the mono mix and
+  then `map`ped onto left and right, rather than each channel normalising
+  itself. A range per channel rescales a quiet side straight back up to match
+  the loud one, which cancels out exactly the stereo lean the visualisers exist
+  to show.
+- **Shape: asymmetric, and only one half is a control.** Attack is a fixed
+  `ATTACK_MS` — there is no musical reason to want a slow rise, and every
+  millisecond of one is lateness you can see — so Decay is the only dial.
+  Exponential, not a per-frame fraction, for the reason `interactive.js` gives.
+- **The stateful audio is in one place.** Followers, ranges and the previous
+  spectrum are all memories of earlier frames, so they live in
+  `createAnalysis()` — which belongs to the frame-loop effect, so leaving music
+  mode and coming back starts from silence rather than a stale envelope.
+  `light/music.js` stays pure, and a test can drive a whole envelope by calling
+  `step` in a loop with a fake clock.
+- **Hits are counted, not flagged.** `createAnalysis` calls a hit when the
+  stretched driver crosses `HIT_ON` and won't call another until it has fallen
+  back under `HIT_OFF`; a single threshold would fire a dozen times as one
+  kick's envelope wobbled across it. The crossing is tested *before* the
+  envelope follower, whose whole job is to hold light after a hit and which
+  would therefore drag the crossing late. It is a counter rather than a boolean
+  because Pulse's Reshuffle uses it as a random seed — the scatter then lands
+  somewhere new on each beat and holds still while the light fades, instead of
+  churning every frame into a shimmer.
+- **The scope triggers.** `findTrigger` finds the first upward zero crossing and
+  the trace is drawn from there. Untriggered, the wave is redrawn from an
+  arbitrary phase sixty times a second and a steady tone reads as noise sliding
+  across the image. Both channels share one trigger, so a stereo pair stays in
+  phase.
+
+There is deliberately **no sensitivity or gain control**. Range normalisation is
+what a gain slider was being asked to compensate for, and it does the job on any
+file without being told. A panel of dials that each need dialling before the
+mode looks like anything is the failure state this replaced.
+
+Two edges are easy to get wrong and are guarded explicitly: **silence must be
+dark** (a region at the very origin of a fill axis sits at u exactly 0, and
+`u <= amount` would keep it lit at zero), and **full must be full** (the soft
+band is dithered inward and the fill stretched by its width, or either end of
+the range becomes a permanent flicker).
+
+Playback position is pulled from the element once per animation frame by
+`AudioTrack.sync()`, not mirrored from `timeupdate` — that event fires about
+four times a second, far too coarse for a moving playhead.
+
 **Animation** (`light/animation.js`) — a sequence of steps played in order, and
-the largest of the four. Its one idea is worth stating plainly, because almost
+the largest of the five. Its one idea is worth stating plainly, because almost
 every animation in the library is the *same* animation with a different sort
 order:
 
@@ -202,7 +306,7 @@ re-normalising a live sequence doesn't churn the list's `{#each}` keys.
 `sequenceLevels(timeMs)` lookup. It runs whether or not playback is going, so
 editing a step's settings while paused updates the stage live.
 
-All three loops take their step from `frameDelta` (`light/clock.js`), which is
+All four animated loops take their step from `frameDelta` (`light/clock.js`), which is
 extracted precisely so the stepping rules — first frame, clamped long gap,
 clock running backwards — are unit-testable. A browser's rAF clock is not.
 
@@ -341,17 +445,19 @@ components/App.svelte             state + layout
 components/stage/Stage.svelte     pan/zoom, pointer, the rAF loop, drag-and-drop
 components/stage/Scene.svelte     the svg: images + mask + region paths
 components/stage/CursorCircle.svelte  optional debug outline of the circle
-components/sidebar/*              one Section per control group (incl. Demos, Debug)
+components/sidebar/*              one Section per control group (incl. Demos, Music, Debug)
 components/toolbar/FloatingToolbar.svelte  scramble / reset view / collapse
 components/ui/*                   primitives (Select is Glimmer's own)
 config/settings.js                every range and default
-config/demos.js                   the bundled demos, and where their files live
-light/{random,interactive,waves,animation}.js  the four modes, as pure functions
+config/demos.js                   the bundled demos and audio sample, and where their files live
+light/{random,interactive,waves,music,animation}.js  the five modes, as pure functions
+audio/engine.js                   AudioContext + <audio> + the analyser nodes
+audio/analysis.js                 onsets, band energy, range normalising, envelope, scope trigger
 render/export.js                  the animation, recorded to video via canvas
 light/{clock,rng}.js              frame stepping, seeded RNG
 svg/{regions,path-data,matrix,shapes}.js  SVG -> regions
 geometry/transform.js             frame <-> screen
-state/{app,theme}.svelte.js       the store, and the theme preference
+state/{app,theme,audio}.svelte.js  the store, the theme preference, the loaded track
 ```
 
 ## Gotchas
@@ -373,9 +479,18 @@ state/{app,theme}.svelte.js       the store, and the theme preference
   drag-and-drop, for the reason the particle playground's layers panel gives:
   native DnD leaks a translucent row ghost and a link cursor that no browser
   lets you suppress.
+- An `AudioContext` is built lazily, on the first `play()`. Created before a
+  user gesture it starts suspended, and browsers log a warning about it on every
+  page load whether or not audio is ever used. `createMediaElementSource` can
+  only be called once per element, which is why the engine keeps one `<audio>`
+  for its whole life and only swaps its `src`.
+- Once the gain node exists, the `<audio>` element's own `volume` has to stay at
+  1 — it gates everything reaching the source node, so the two would otherwise
+  multiply. Volume and analyser smoothing set before the graph is built are held
+  in the engine and applied when the nodes appear.
 - Keyboard: **R** refits the view, **⌘/Ctrl + \\** collapses the sidebar, and
-  holding **Space** turns a drag into a pan — except in Animation mode, where
-  Space is the transport instead. Nothing is given up for that: `spaceHeld` only
+  holding **Space** turns a drag into a pan — except in Animation and Music
+  modes, where Space is the transport instead. Nothing is given up for that: `spaceHeld` only
   ever set the grab cursor, and a drag pans in every mode with or without it. All of them are ignored while a
   text field has focus. Collapsing also hides the floating toolbar — the stage
   goes fully chrome-free — so **⌘/Ctrl + \\** is the only way back in.

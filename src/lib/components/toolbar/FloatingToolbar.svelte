@@ -47,6 +47,21 @@
 				<IconPlayerSkipBack size={18} />
 			</IconButton>
 		{/if}
+		{#if app.mode === 'music' && app.audio.hasTrack}
+			<IconButton
+				title={app.audio.playing ? 'Pause (Space)' : 'Play (Space)'}
+				onclick={() => app.audio.toggle()}
+			>
+				{#if app.audio.playing}
+					<IconPlayerPause size={18} />
+				{:else}
+					<IconPlayerPlay size={18} />
+				{/if}
+			</IconButton>
+			<IconButton title="Back to the start" onclick={() => app.audio.restart()}>
+				<IconPlayerSkipBack size={18} />
+			</IconButton>
+		{/if}
 		<IconButton title="Reset view (R)" onclick={onResetView}>
 			<IconFocusCentered size={18} />
 		</IconButton>

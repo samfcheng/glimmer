@@ -11,6 +11,7 @@ import {
 	totalDuration
 } from '../light/animation.js';
 import { parseSvgRegions } from '../svg/regions.js';
+import { AudioTrack } from './audio.svelte.js';
 
 const emptyImage = () => ({ url: null, naturalWidth: 0, naturalHeight: 0, file: null, name: null });
 
@@ -65,6 +66,17 @@ export class AppState {
 	waveSoftness = $state(defaults.waveSoftness);
 	waveCentreX = $state(defaults.waveCentreX);
 	waveCentreY = $state(defaults.waveCentreY);
+	musicVisual = $state(defaults.musicVisual);
+	musicDriver = $state(defaults.musicDriver);
+	musicStereo = $state(defaults.musicStereo);
+	musicChurn = $state(defaults.musicChurn);
+	musicBase = $state(defaults.musicBase);
+	musicDecayMs = $state(defaults.musicDecayMs);
+	musicSoftness = $state(defaults.musicSoftness);
+	musicDirection = $state(defaults.musicDirection);
+	musicMirror = $state(defaults.musicMirror);
+	musicAmplitude = $state(defaults.musicAmplitude);
+	musicThickness = $state(defaults.musicThickness);
 	/** The animation sequence, played top to bottom. Its own copy — never the array in `defaults`. */
 	animationSteps = $state(normalizeSteps(defaults.animationSteps));
 	animationLoop = $state(defaults.animationLoop);
@@ -83,6 +95,13 @@ export class AppState {
 	animationPlaying = $state(true);
 	/** Which step's settings panel is open in the sidebar, or null. */
 	openStepId = $state(null);
+
+	/**
+	 * The loaded audio track and its transport. Not a setting and not touched by
+	 * `applySettings` — a demo describes a look, and the file someone dropped in
+	 * outlives whichever look is dialled in over it.
+	 */
+	audio = new AudioTrack();
 
 	/** Seed behind the current random-mode rolls; bumping it is a scramble. */
 	seed = $state(Math.floor(Math.random() * 0xffffffff));
@@ -268,16 +287,21 @@ export class AppState {
 	// only when the scene or a step's settings do — so deriving them here is
 	// what keeps playback down to one array map per frame.
 
-	/** Every region's centroid as a fraction of the frame — the only geometry the animations see. */
-	animationLayout = $derived(buildAnimationLayout(this.svg.regions, this.frame));
+	/**
+	 * Every region's centroid as a fraction of the frame. Built by the animation
+	 * module but not specific to it — music mode reads the same layout, since
+	 * "where is this window, as a fraction of the picture" is the only geometry
+	 * either of them needs.
+	 */
+	regionLayout = $derived(buildAnimationLayout(this.svg.regions, this.frame));
 
 	/** Per step, the moment each region flips. Null for the sustained kinds, which have no order. */
 	animationArrivals = $derived(
-		this.animationSteps.map((step) => arrivalsFor(step, this.animationLayout))
+		this.animationSteps.map((step) => arrivalsFor(step, this.regionLayout))
 	);
 
 	/** Per step, the levels it begins from — the timeline folded up from an all-dark opening. */
-	animationStarts = $derived(sequenceStarts(this.animationSteps, this.animationLayout));
+	animationStarts = $derived(sequenceStarts(this.animationSteps, this.regionLayout));
 
 	animationDuration = $derived(totalDuration(this.animationSteps));
 

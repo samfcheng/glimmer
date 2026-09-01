@@ -45,6 +45,30 @@ export const settings = {
 	// shares of its width/height. ±0.5 sits on an edge; further is off-image.
 	waveCentre: { min: -1, max: 1, step: 0.01 },
 
+	// --- Music mode ---
+	// Share of windows Pulse keeps lit through the quiet — a building with every
+	// window dark between beats reads as broken rather than as quiet.
+	musicBase: { min: 0, max: 0.6, step: 0.01 },
+	// How long the light takes to fall away after a hit, in milliseconds. The
+	// rise is fixed (`ATTACK_MS`): there is no musical reason to want a slow
+	// attack, and every millisecond of one is lateness you can see.
+	musicDecay: { min: 40, max: 1200, step: 10 },
+	// How much of an edge (a meter's front, a bar's top, a scope's line) is
+	// dithered against each region's own threshold rather than solid.
+	musicSoftness: { min: 0, max: 1, step: 0.01 },
+	// Scope: height of the trace as a share of the space it is drawn in, and
+	// how far either side of the line a window still counts as on it.
+	musicAmplitude: { min: 0, max: 1, step: 0.05 },
+	musicThickness: { min: 0.01, max: 0.4, step: 0.01 },
+	// Playback volume. Session state rather than a setting, but the range
+	// belongs here with every other one.
+	musicVolume: { min: 0, max: 1, step: 0.01 },
+	// The span the Spectrum visualiser draws across the image, logarithmically.
+	// Below ~40 Hz is rumble no window would show, and past ~12 kHz there is
+	// nothing in most mixes but cymbal air.
+	musicMinHz: 40,
+	musicMaxHz: 12000,
+
 	// --- Animation mode ---
 	// How long one step of the sequence runs.
 	stepDuration: { min: 100, max: 20000, step: 50 },
@@ -93,6 +117,7 @@ export const MODES = [
 	{ value: 'random', label: 'Random' },
 	{ value: 'interactive', label: 'Interactive' },
 	{ value: 'waves', label: 'Waves' },
+	{ value: 'music', label: 'Music' },
 	{ value: 'animation', label: 'Animation' }
 ];
 
@@ -113,6 +138,17 @@ export const defaults = {
 	waveSoftness: 0.3,
 	waveCentreX: 0,
 	waveCentreY: 0,
+	musicVisual: 'pulse',
+	musicDriver: 'beat',
+	musicStereo: true,
+	musicChurn: true,
+	musicBase: 0.06,
+	musicDecayMs: 220,
+	musicSoftness: 0.3,
+	musicDirection: 'up',
+	musicMirror: true,
+	musicAmplitude: 0.8,
+	musicThickness: 0.1,
 	// The sequence itself is a setting, so a demo can ship a whole
 	// choreography in its `settings.json` alongside the look.
 	animationSteps: normalizeSteps(DEFAULT_SEQUENCE),
